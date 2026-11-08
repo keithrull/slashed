@@ -36,6 +36,7 @@ export interface FighterConfig {
   title: string;
   description: string;
   portraitUrl: string;
+  spriteUrl: string;
   maxHealth: number;
   walkSpeed: number;
   dashSpeed: number;
@@ -66,6 +67,7 @@ export const FIGHTER_ROSTER: Record<FighterId, FighterConfig> = {
     description:
       'Master of Iaijutsu quick-draw slashes and pressurized crimson wind waves. Balanced speed, reach, and lethal combo flow.',
     portraitUrl: '/assets/portrait_kazemaru.jpg',
+    spriteUrl: '/assets/sprite_kazemaru.jpg',
     maxHealth: 1000,
     walkSpeed: 5.4,
     dashSpeed: 12.5,
@@ -225,6 +227,7 @@ export const FIGHTER_ROSTER: Record<FighterId, FighterConfig> = {
     description:
       'Blindingly fast twin-kodachi assassin painted in sakura & cyan-indigo washes. Excels at air mobility and rapid multi-cuts.',
     portraitUrl: '/assets/portrait_hotaru.jpg',
+    spriteUrl: '/assets/sprite_hotaru.jpg',
     maxHealth: 900,
     walkSpeed: 6.6,
     dashSpeed: 15.0,
@@ -384,6 +387,7 @@ export const FIGHTER_ROSTER: Record<FighterId, FighterConfig> = {
     description:
       'Colossal warrior-monk painted in heavy dry-brush charcoal and amber gold leaf. Crushes guards with earth-shattering strikes.',
     portraitUrl: '/assets/portrait_raidenbo.jpg',
+    spriteUrl: '/assets/sprite_raidenbo.jpg',
     maxHealth: 1220,
     walkSpeed: 4.1,
     dashSpeed: 10.2,
@@ -544,6 +548,7 @@ export const FIGHTER_ROSTER: Record<FighterId, FighterConfig> = {
     description:
       'Graceful swordmaster rendered in Prussian blue and winter plum washes. Commands supreme blade reach with her frost naginata.',
     portraitUrl: '/assets/portrait_yuki.jpg',
+    spriteUrl: '/assets/sprite_yuki.jpg',
     maxHealth: 960,
     walkSpeed: 5.2,
     dashSpeed: 12.2,

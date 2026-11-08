@@ -141,8 +141,11 @@ export class SlashedGameEngine {
     this.ctx = canvas.getContext('2d')!;
     this.renderer = new WatercolorRenderer(canvas.width, canvas.height);
 
-    // Preload all fighter portraits
-    Object.values(FIGHTER_ROSTER).forEach((f) => this.renderer.preloadPortrait(f.portraitUrl));
+    // Preload all fighter portraits & full-body watercolor sprites
+    Object.values(FIGHTER_ROSTER).forEach((f) => {
+      this.renderer.preloadPortrait(f.portraitUrl);
+      this.renderer.preloadFighterSprite(f.spriteUrl);
+    });
 
     this.fighters = [
       new FighterInstance(0, 'kazemaru', 360, 1),

@@ -62,6 +62,16 @@ export interface WatercolorProjectile {
   trailTimer: number;
 }
 
+export interface ProcessedFighterSprite {
+  canvas: HTMLCanvasElement;
+  cropX: number;
+  cropY: number;
+  cropW: number;
+  cropH: number;
+  footCenterX: number;
+  footBottomY: number;
+}
+
 export class WatercolorRenderer {
   public width: number;
   public height: number;
@@ -73,6 +83,7 @@ export class WatercolorRenderer {
   private stageBgImg: HTMLImageElement;
   private stageBgLoaded: boolean = false;
   private portraitImages: Map<string, HTMLImageElement> = new Map();
+  private fighterSprites: Map<string, ProcessedFighterSprite> = new Map();
 
   public particles: InkParticle[] = [];
   public ambientPetals: InkParticle[] = [];
@@ -107,6 +118,139 @@ export class WatercolorRenderer {
     img.src = url;
     this.portraitImages.set(url, img);
     return img;
+  }
+
+  // Loads a full-body watercolor sprite and flood-fills its outer white studio backdrop to transparent
+  // while preserving internal white kimono crane motifs, kitsune mask, silver hair, and skin highlights!
+  public preloadFighterSprite(url: string): void {
+    if (this.fighterSprites.has(url)) return;
+
+    const img = new Image();
+    img.src = url;
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      const off = document.createElement('canvas');
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext('2d')!;
+      octx.drawImage(img, 0, 0);
+
+      const imgData = octx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+      const visited = new Uint8Array(w * h);
+      const queue = new Int32Array(w * h);
+      let head = 0;
+      let tail = 0;
+
+      const isBgWhite = (idx: number): boolean => {
+        const p = idx * 4;
+        return data[p] > 234 && data[p + 1] > 234 && data[p + 2] > 234;
+      };
+
+      // Seed BFS from all 4 border edges
+      for (let x = 0; x < w; x++) {
+        const topIdx = x;
+        const botIdx = (h - 1) * w + x;
+        if (isBgWhite(topIdx)) {
+          visited[topIdx] = 1;
+          queue[tail++] = topIdx;
+        }
+        if (isBgWhite(botIdx)) {
+          visited[botIdx] = 1;
+          queue[tail++] = botIdx;
+        }
+      }
+      for (let y = 0; y < h; y++) {
+        const leftIdx = y * w;
+        const rightIdx = y * w + (w - 1);
+        if (!visited[leftIdx] && isBgWhite(leftIdx)) {
+          visited[leftIdx] = 1;
+          queue[tail++] = leftIdx;
+        }
+        if (!visited[rightIdx] && isBgWhite(rightIdx)) {
+          visited[rightIdx] = 1;
+          queue[tail++] = rightIdx;
+        }
+      }
+
+      while (head < tail) {
+        const curr = queue[head++];
+        data[curr * 4 + 3] = 0; // Set alpha = 0 for exterior background
+
+        const cx = curr % w;
+        const cy = (curr - cx) / w;
+
+        const neighbors = [
+          cx > 0 ? curr - 1 : -1,
+          cx < w - 1 ? curr + 1 : -1,
+          cy > 0 ? curr - w : -1,
+          cy < h - 1 ? curr + w : -1,
+        ];
+
+        for (let i = 0; i < 4; i++) {
+          const n = neighbors[i];
+          if (n !== -1 && !visited[n]) {
+            if (isBgWhite(n)) {
+              visited[n] = 1;
+              queue[tail++] = n;
+            } else {
+              // Soft anti-aliased edge feathering where exterior white meets dark sumi ink outline
+              const np = n * 4;
+              const lum = (data[np] + data[np + 1] + data[np + 2]) / 3;
+              if (lum > 205) {
+                data[np + 3] = Math.round(((240 - lum) / 35) * 255);
+              }
+            }
+          }
+        }
+      }
+
+      // Compute tight bounding box of the non-transparent character figure
+      let minX = w,
+        minY = h,
+        maxX = 0,
+        maxY = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (data[(y * w + x) * 4 + 3] > 25) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      // Compute horizontal center of the feet (bottom 15% of figure) so the character stands centered on their hitbox!
+      let footSumX = 0;
+      let footCount = 0;
+      const footStartY = Math.floor(maxY - (maxY - minY) * 0.18);
+      for (let y = footStartY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (data[(y * w + x) * 4 + 3] > 80) {
+            footSumX += x;
+            footCount++;
+          }
+        }
+      }
+
+      octx.putImageData(imgData, 0, 0);
+
+      const cropW = Math.max(1, maxX - minX + 1);
+      const cropH = Math.max(1, maxY - minY + 1);
+      const footCenterX = footCount > 0 ? footSumX / footCount - minX : cropW * 0.45;
+
+      this.fighterSprites.set(url, {
+        canvas: off,
+        cropX: minX,
+        cropY: minY,
+        cropW,
+        cropH,
+        footCenterX,
+        footBottomY: cropH,
+      });
+    };
   }
 
   private createWashiPaperTexture(w: number, h: number): HTMLCanvasElement {
@@ -425,7 +569,8 @@ export class WatercolorRenderer {
     ctx.restore();
   }
 
-  // Render an articulated Samurai Fighter in dynamic Sumi-e Brush & Watercolor Wash style
+  // Render an articulated Samurai Fighter using their full-body Japanese Watercolor & Sumi-e artwork
+  // with procedural squash/stretch, breathing, lunge skew, afterimages, and brush aura
   public renderSamuraiFighter(
     ctx: CanvasRenderingContext2D,
     config: FighterConfig,
@@ -440,201 +585,184 @@ export class WatercolorRenderer {
     hitFlashFrames: number,
     activeAttackKey: string | null
   ): void {
+    // Ensure sprite is loading / processed
+    this.preloadFighterSprite(config.spriteUrl);
+    const sprite = this.fighterSprites.get(config.spriteUrl);
+
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(facing, 1);
 
-    // Ground ink shadow beneath feet
-    ctx.fillStyle = 'rgba(20, 16, 13, 0.36)';
+    // 1. Ground ink shadow beneath feet
+    ctx.fillStyle = 'rgba(20, 16, 13, 0.42)';
     ctx.beginPath();
-    ctx.ellipse(0, 0, config.bodyWidth * 0.72, 11, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, config.bodyWidth * 0.85, 13, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Compute procedural posture & joint angles from state
-    const breathe = Math.sin(animTick * 0.1) * 3.5;
+    // Compute dynamic animation transforms (breathing, walk bob, crouch squash, attack lunge & rotation)
+    const breatheScaleY = 1 + Math.sin(animTick * 0.09) * 0.018;
+    const breatheScaleX = 1 - Math.sin(animTick * 0.09) * 0.01;
     const isMoving = state === 'walk_fwd' || state === 'walk_back' || state === 'dash';
-    const legStride = isMoving ? Math.sin(animTick * 0.36) * 24 : 8;
-    const crouchOffset = state === 'crouch' ? 28 : 0;
-    const hitLean = state === 'hitstun' ? -18 : state === 'blockstun' ? -9 : 0;
+    const walkBobY = isMoving ? Math.abs(Math.sin(animTick * 0.34)) * -10 : 0;
+    const walkTilt =
+      state === 'dash'
+        ? 0.16
+        : state === 'walk_fwd'
+          ? 0.06 + Math.sin(animTick * 0.34) * 0.03
+          : state === 'walk_back'
+            ? -0.05
+            : 0;
 
-    let torsoLean = state === 'dash' ? 0.34 : state === 'walk_fwd' ? 0.14 : state === 'walk_back' ? -0.1 : 0.05;
-    let swordAngle = -0.35 + Math.sin(animTick * 0.06) * 0.05;
-    let armReachX = 22;
-    let armReachY = -88 + crouchOffset + breathe;
+    let scaleX = breatheScaleX;
+    let scaleY = breatheScaleY;
+    let rotation = walkTilt;
+    let offsetX = 0;
+    let offsetY = walkBobY;
 
-    if (state === 'attack' && activeAttackKey) {
+    if (state === 'crouch') {
+      scaleY = 0.76;
+      scaleX = 1.12;
+      offsetY = 6;
+    } else if (state === 'jump') {
+      scaleY = 1.06;
+      scaleX = 0.95;
+      rotation = -0.06;
+    } else if (state === 'attack' && activeAttackKey) {
       const atk = config.attacks[activeAttackKey as keyof typeof config.attacks];
       const total = atk.startup + atk.active + atk.recovery;
-      const p = Math.min(1, stateFrame / Math.max(1, total));
       if (stateFrame <= atk.startup) {
-        // Wind-up coil
+        // Coil back before strike
         const wp = stateFrame / Math.max(1, atk.startup);
-        torsoLean = -0.22 * wp;
-        swordAngle = atk.slashArcStart - 0.6 * wp;
-        armReachX = 6 - 14 * wp;
+        rotation = -0.14 * wp;
+        offsetX = -16 * wp;
+        scaleX = 0.94;
+        scaleY = 1.04;
       } else if (stateFrame <= atk.startup + atk.active) {
-        // Full brush extension slash!
+        // Explosive forward slash lunge!
         const ap = (stateFrame - atk.startup) / Math.max(1, atk.active);
-        torsoLean = 0.38;
-        swordAngle = atk.slashArcStart + (atk.slashArcEnd - atk.slashArcStart) * ap;
-        armReachX = 48;
-        armReachY = -92 + crouchOffset;
+        rotation = 0.18 - ap * 0.06;
+        offsetX = 28;
+        scaleX = 1.12;
+        scaleY = 0.95;
       } else {
         // Zanshin follow-through recovery
-        torsoLean = 0.25 * (1 - p);
-        swordAngle = atk.slashArcEnd;
-        armReachX = 34;
+        const rp = (stateFrame - atk.startup - atk.active) / Math.max(1, atk.recovery);
+        rotation = 0.12 * (1 - rp);
+        offsetX = 28 * (1 - rp);
       }
     } else if (state === 'parry') {
-      torsoLean = -0.08;
-      swordAngle = -1.45; // Vertical guard blade in front of face
-      armReachX = 28;
-      armReachY = -102;
+      rotation = -0.06;
+      scaleY = 1.04;
     } else if (state === 'blockstun') {
-      torsoLean = -0.14;
-      swordAngle = -1.25;
-      armReachX = 24;
+      rotation = -0.1;
+      offsetX = -10;
     } else if (state === 'hitstun') {
-      torsoLean = -0.35;
-      swordAngle = 0.65;
-      armReachX = -8;
+      rotation = -0.24;
+      offsetX = -18;
+      scaleX = 0.94;
     } else if (state === 'ko') {
-      ctx.rotate(-1.42);
-      ctx.translate(0, -25);
+      rotation = -1.48;
+      offsetY = -18;
     }
 
-    const hipY = -58 + crouchOffset + breathe * 0.5;
-    const shoulderY = -118 + crouchOffset + breathe;
+    const shoulderY = -120 + offsetY;
 
-    // 1. Back flowing watercolor scarf / haori aura ribbon
+    // 2. Back flowing watercolor scarf / spirit ribbon
     this.drawFlowingWatercolorRibbon(
       ctx,
-      -14,
-      shoulderY + 8,
+      -18 + offsetX,
+      shoulderY,
       animTick,
       config.accentWatercolor,
       config.secondaryWatercolor,
       isMoving || state === 'attack'
     );
 
-    // 2. Watercolor Inner Wash Aura (wet pigment glow inside silhouette)
-    const auraGrad = ctx.createRadialGradient(0, hipY - 20, 10, 0, hipY - 20, config.bodyHeight * 0.62);
-    auraGrad.addColorStop(0, this.hexToRgba(config.accentWatercolor, 0.34));
-    auraGrad.addColorStop(0.6, this.hexToRgba(config.secondaryWatercolor, 0.16));
+    // 3. Wet Watercolor Inner Wash Aura behind the painted figure
+    const auraGrad = ctx.createRadialGradient(
+      offsetX,
+      -config.bodyHeight * 0.55,
+      12,
+      offsetX,
+      -config.bodyHeight * 0.55,
+      config.bodyHeight * 0.75
+    );
+    auraGrad.addColorStop(0, this.hexToRgba(config.accentWatercolor, state === 'attack' ? 0.42 : 0.24));
+    auraGrad.addColorStop(0.6, this.hexToRgba(config.secondaryWatercolor, 0.12));
     auraGrad.addColorStop(1, this.hexToRgba(config.accentWatercolor, 0));
     ctx.fillStyle = auraGrad;
     ctx.beginPath();
-    ctx.arc(0, hipY - 20, config.bodyHeight * 0.62, 0, Math.PI * 2);
+    ctx.arc(offsetX, -config.bodyHeight * 0.55, config.bodyHeight * 0.75, 0, Math.PI * 2);
     ctx.fill();
 
-    // 3. Hakama (Pleated Samurai Trousers) rendered with broad angled brush strokes
-    ctx.save();
-    ctx.translate(hitLean * 0.5, 0);
+    // 4. Render Full-Body Painted Watercolor Sprite (or fallback while loading on frame 1)
+    if (sprite) {
+      const targetHeight = config.bodyHeight * 1.48; // ~215-250px tall including weapon/hair crest
+      const drawScale = targetHeight / sprite.cropH;
+      const drawW = sprite.cropW * drawScale;
+      const drawH = targetHeight;
+      const anchorX = sprite.footCenterX * drawScale;
 
-    // Back Leg Hakama
-    this.drawCalligraphicLimb(
-      ctx,
-      -8,
-      hipY,
-      -16 - legStride,
-      -4,
-      26,
-      16,
-      config.primaryInk,
-      config.robeColor
-    );
-    // Front Leg Hakama
-    this.drawCalligraphicLimb(
-      ctx,
-      8,
-      hipY,
-      18 + legStride,
-      -4,
-      28,
-      17,
-      config.robeColor,
-      config.accentWatercolor
-    );
+      // Draw ghosting watercolor afterimage during Dash, Special, or Super Arts!
+      if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
+        ctx.save();
+        ctx.translate(offsetX - 26, offsetY);
+        ctx.rotate(rotation * 0.7);
+        ctx.scale(scaleX, scaleY);
+        ctx.globalAlpha = 0.35;
+        ctx.filter = 'sepia(1) saturate(4) hue-rotate(-25deg)';
+        ctx.drawImage(
+          sprite.canvas,
+          sprite.cropX,
+          sprite.cropY,
+          sprite.cropW,
+          sprite.cropH,
+          -anchorX,
+          -drawH + 8,
+          drawW,
+          drawH
+        );
+        ctx.restore();
+      }
 
-    // 4. Torso & Haori Coat
-    ctx.save();
-    ctx.translate(0, hipY);
-    ctx.rotate(torsoLean);
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+      ctx.rotate(rotation);
+      ctx.scale(scaleX, scaleY);
 
-    // Haori silhouette in sumi ink & watercolor wash
-    ctx.fillStyle = hitFlashFrames > 0 ? '#fff5f5' : config.robeColor;
-    ctx.strokeStyle = config.primaryInk;
-    ctx.lineWidth = 4.5;
-    ctx.beginPath();
-    ctx.moveTo(-config.bodyWidth * 0.42, 6);
-    ctx.quadraticCurveTo(-config.bodyWidth * 0.52, -32, -config.bodyWidth * 0.36, -64);
-    ctx.lineTo(config.bodyWidth * 0.38, -64);
-    ctx.quadraticCurveTo(config.bodyWidth * 0.5, -28, config.bodyWidth * 0.42, 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+      if (hitFlashFrames > 0) {
+        ctx.filter = 'brightness(2.2) contrast(1.2) saturate(1.8)';
+      } else if (isParrying || state === 'parry') {
+        ctx.filter = 'drop-shadow(0px 0px 10px #fcc419) brightness(1.15)';
+      } else {
+        ctx.filter = `drop-shadow(0px 4px 6px rgba(24, 21, 18, 0.32))`;
+      }
 
-    // Obi (Sash) in accent watercolor
-    ctx.fillStyle = config.accentWatercolor;
-    ctx.fillRect(-config.bodyWidth * 0.4, -10, config.bodyWidth * 0.8, 12);
+      ctx.drawImage(
+        sprite.canvas,
+        sprite.cropX,
+        sprite.cropY,
+        sprite.cropW,
+        sprite.cropH,
+        -anchorX,
+        -drawH + 8,
+        drawW,
+        drawH
+      );
+      ctx.restore();
+    }
 
-    // Chest diagonal kimono lapel brush strokes
-    ctx.strokeStyle = config.accentWatercolor;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(-14, -62);
-    ctx.lineTo(12, -10);
-    ctx.moveTo(14, -62);
-    ctx.lineTo(-6, -24);
-    ctx.stroke();
-
-    // 5. Head & Distinctive Samurai Headgear
-    const headY = -78;
-    // Neck & Face
-    ctx.fillStyle = '#efe2cf';
-    ctx.strokeStyle = config.primaryInk;
-    ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    ctx.arc(2, headY, 16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Fierce glowing brush eye
-    ctx.fillStyle = config.accentWatercolor;
-    ctx.beginPath();
-    ctx.moveTo(6, headY - 3);
-    ctx.lineTo(16, headY - 6);
-    ctx.lineTo(13, headY);
-    ctx.closePath();
-    ctx.fill();
-
-    this.drawFighterHeadgear(ctx, config, headY, animTick);
-
-    ctx.restore(); // end torso rotation
-
-    // 6. Sword Arm & Weapon (Katana / Twin Kodachi / Kanabo / Frost Naginata)
-    this.drawSamuraiWeaponAndArm(
-      ctx,
-      config,
-      armReachX,
-      armReachY,
-      swordAngle,
-      state === 'attack',
-      isParrying
-    );
-
-    // 7. Mind's Eye Parry Golden Enso Circle (圓相)
+    // 5. Mind's Eye Parry Golden Enso Circle (圓相)
     if (isParrying || state === 'parry') {
       ctx.save();
       ctx.strokeStyle = '#f59f00';
-      ctx.lineWidth = 5;
+      ctx.lineWidth = 5.5;
       ctx.beginPath();
-      ctx.arc(18, shoulderY + 12, 54, -0.4, Math.PI * 1.65);
+      ctx.arc(16 + offsetX, -config.bodyHeight * 0.58, 68, -0.4, Math.PI * 1.65);
       ctx.stroke();
       ctx.restore();
     }
 
-    ctx.restore();
     ctx.restore();
   }
 
