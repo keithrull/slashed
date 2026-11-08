@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>墨斬 SLASHED — Sumi-e Watercolor Samurai Duel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Noto+Serif+JP:wght@500;700;900&family=Yuji+Syuku&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- SVG Filters for Living Watercolor Bleed & Washi Paper Displacement -->
+  <svg width="0" height="0" style="position:absolute; pointer-events:none;">
+    <defs>
+      <filter id="watercolor-bleed" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+      <filter id="ink-roughen" x="-15%" y="-15%" width="130%" height="130%">
+        <feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="2" result="turb" />
+        <feDisplacementMap in="SourceGraphic" in2="turb" scale="6" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div id="app">
+    <div id="stage-frame">
+      <canvas id="game-canvas" width="1280" height="720"></canvas>
+
+      <!-- Top Bar Overlay for Quick Mode / Controls / Sound toggles -->
+      <div id="top-Controls-bar">
+        <div class="brand-seal" title="Sumi-Giri (Slashed)">墨斬</div>
+        <div class="top-actions">
+          <button id="btn-mode-toggle" class="ink-btn small-btn" title="Switch Game Mode">Mode: 1P vs AI</button>
+          <button id="btn-char-select" class="ink-btn small-btn" title="Open Character Select">Fighters (C)</button>
+          <button id="btn-practice-ai" class="ink-btn small-btn" title="Toggle AI Difficulty">AI: Ronin</button>
+          <button id="btn-clear-ink" class="ink-btn small-btn" title="Wash Washi Canvas">Wash Ink (R)</button>
+          <button id="btn-sound" class="ink-btn small-btn" title="Toggle Traditional Audio">Sound: ON</button>
+          <button id="btn-help" class="ink-btn small-btn" title="Show Move List & Controls">Scroll of Moves (?)</button>
+        </div>
+      </div>
+
+      <!-- Character Select & Title Modal Overlay -->
+      <div id="overlay-screen" class="overlay-screen active">
+        <div class="washi-modal">
+          <div class="red-hanko-seal">御前試合</div>
+          <h1 class="game-title">
+            <span class="kanji-title">墨 斬</span>
+            <span class="en-title">S L A S H E D</span>
+            <span class="sub-title">Suibokuga &amp; Sumi-e Samurai Fighting</span>
+          </h1>
+
+          <div class="mode-selector">
+            <button class="mode-pill active" data-mode="ai">⚔️ 1P vs CPU (Duel)</button>
+            <button class="mode-pill" data-mode="versus">🎎 Local 2P Versus</button>
+            <button class="mode-pill" data-mode="training">🎋 Dojo Practice</button>
+          </div>
+
+          <div class="selection-status">
+            <div class="p1-pick-badge">P1: <span id="p1-pick-name">KAZEMARU (風丸)</span></div>
+            <div class="vs-seal">対</div>
+            <div class="p2-pick-badge">P2 / CPU: <span id="p2-pick-name">HOTARU (蛍)</span></div>
+          </div>
+
+          <div class="pick-instructions">
+            Click a Fighter to assign <strong id="assign-target-label">Player 1</strong> (Shift+Click or Right-Click for Player 2 / CPU)
+          </div>
+
+          <div id="fighter-grid" class="fighter-grid">
+            <!-- Populated dynamically by main.ts -->
+          </div>
+
+          <div class="stage-selector-row">
+            <span class="stage-label">Stage Scroll:</span>
+            <button class="stage-pill active" data-stage="crimson_torii">⛩️ Crimson Torii Peak</button>
+            <button class="stage-pill" data-stage="indigo_bamboo">🎋 Indigo Bamboo Mist</button>
+            <button class="stage-pill" data-stage="golden_temple">🍂 Autumn Kinkaku Bridge</button>
+            <button class="stage-pill" data-stage="snow_shrine">❄️ Silent Snow Shrine</button>
+          </div>
+
+          <div class="start-row">
+            <button id="btn-start-match" class="ink-btn primary-ink-btn">
+              <span>いざ尋常に — BEGIN DUEL (SPACE / ENTER)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Move List & Controls Scroll Modal -->
+      <div id="help-modal" class="overlay-screen hidden">
+        <div class="washi-modal help-scroll">
+          <h2>巻物 — Scroll of Bushido &amp; Controls</h2>
+          <div class="controls-columns">
+            <div class="control-card">
+              <h3>Player 1 (Left Ronin)</h3>
+              <ul>
+                <li><kbd>A</kbd> / <kbd>D</kbd> — Move / Back-Walk (Hold Back to Block)</li>
+                <li><kbd>W</kbd> — Jump &nbsp;|&nbsp; <kbd>S</kbd> — Crouch</li>
+                <li><kbd>Double-Tap A/D</kbd> or <kbd>L-Shift</kbd> — Ink Step Dash</li>
+                <li><kbd>U</kbd> — Quick Sumi Cut (Light Fast Slash)</li>
+                <li><kbd>I</kbd> — Crimson Draw (Medium Wide Slash)</li>
+                <li><kbd>O</kbd> — Overhead Cleave (Heavy Armor-Crushing Slash)</li>
+                <li><kbd>J</kbd> — Mind's Eye Parry (Deflect &amp; Stun Counter!)</li>
+                <li><kbd>K</kbd> — Watercolor Wave Art (Special Projectile / Rush)</li>
+                <li><kbd>L</kbd> — Rising Dragon Brush (Anti-Air / Launcher)</li>
+                <li><kbd>Space</kbd> or <kbd>U+I</kbd> — <strong>墨奥義 ZANSHIN SUPER ART</strong> (Requires 100% Ink Gauge)</li>
+              </ul>
+            </div>
+            <div class="control-card">
+              <h3>Player 2 (Right Ronin — Local 2P)</h3>
+              <ul>
+                <li><kbd>←</kbd> / <kbd>→</kbd> — Move / Back-Walk (Hold Back to Block)</li>
+                <li><kbd>↑</kbd> — Jump &nbsp;|&nbsp; <kbd>↓</kbd> — Crouch</li>
+                <li><kbd>Double-Tap ←/→</kbd> or <kbd>R-Shift</kbd> — Ink Step Dash</li>
+                <li><kbd>Numpad 4</kbd> or <kbd>V</kbd> — Quick Sumi Cut (Light)</li>
+                <li><kbd>Numpad 5</kbd> or <kbd>B</kbd> — Crimson Draw (Medium)</li>
+                <li><kbd>Numpad 6</kbd> or <kbd>N</kbd> — Overhead Cleave (Heavy)</li>
+                <li><kbd>Numpad 1</kbd> or <kbd>G</kbd> — Mind's Eye Parry</li>
+                <li><kbd>Numpad 2</kbd> or <kbd>H</kbd> — Watercolor Wave Art (Special 1)</li>
+                <li><kbd>Numpad 3</kbd> or <kbd>M</kbd> — Rising Dragon Brush (Special 2)</li>
+                <li><kbd>Enter</kbd> or <kbd>Numpad 0</kbd> — <strong>墨奥義 ZANSHIN SUPER ART</strong></li>
+              </ul>
+            </div>
+          </div>
+          <div class="bushido-tips">
+            <p><strong>🎨 Living Washi Canvas:</strong> Every sword slash, blood blossom, and watercolor wave leaves real pigment on the paper scroll! Press <kbd>R</kbd> anytime to wash the paper clean.</p>
+            <p><strong>⚡ Mind's Eye Parry (心眼):</strong> Time your Parry just as an enemy blade strikes to freeze time in a golden sumi flash and open them for a devastating counter-combo!</p>
+            <p><strong>🔥 Cancel System:</strong> Cancel Normal Cuts (Light → Medium → Heavy) directly into Special Arts or your Zanshin Super Art for multi-hit brush combos!</p>
+          </div>
+          <button id="btn-close-help" class="ink-btn primary-ink-btn">Close Scroll (ESC)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

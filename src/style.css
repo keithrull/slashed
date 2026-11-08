@@ -1,0 +1,476 @@
+:root {
+  --washi-cream: #f4ece1;
+  --washi-aged: #e6d7c3;
+  --washi-dark: #c8b499;
+  --sumi-black: #181512;
+  --sumi-charcoal: #2e2925;
+  --vermilion: #c92a2a;
+  --vermilion-glow: #e03131;
+  --indigo-ink: #1e3a5f;
+  --gold-leaf: #d49b27;
+  --sakura-pink: #d96b83;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, #26211d 0%, #100d0b 100%);
+  color: var(--sumi-black);
+  font-family: 'Noto Serif JP', serif;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+#stage-frame {
+  position: relative;
+  width: min(100%, calc((100vh - 24px) * (16 / 9)));
+  aspect-ratio: 16 / 9;
+  background: var(--washi-cream);
+  border: 6px solid #1c1815;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.85),
+    0 0 0 2px #8c765c,
+    inset 0 0 40px rgba(84, 62, 38, 0.35);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+/* Top Floating Controls Bar */
+#top-Controls-bar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(244, 236, 225, 0.86);
+  border: 1.5px solid rgba(24, 21, 18, 0.55);
+  padding: 4px 10px;
+  border-radius: 3px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(4px);
+}
+
+.brand-seal {
+  background: var(--vermilion);
+  color: #fff8f0;
+  font-family: 'Yuji Syuku', 'Noto Serif JP', serif;
+  font-weight: 900;
+  font-size: 0.9rem;
+  padding: 2px 7px;
+  border: 1.5px solid #8a1515;
+  border-radius: 2px;
+  letter-spacing: 2px;
+}
+
+.top-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ink-btn {
+  background: var(--sumi-black);
+  color: var(--washi-cream);
+  border: 1.5px solid #4a3f35;
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  border-radius: 2px;
+}
+
+.ink-btn.small-btn {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  letter-spacing: 0.4px;
+}
+
+.ink-btn:hover {
+  background: var(--vermilion);
+  border-color: var(--vermilion-glow);
+  transform: translateY(-1px);
+}
+
+/* Overlay Modal Screens (Character Select & Help Scroll) */
+.overlay-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: rgba(20, 16, 13, 0.72);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  transition: opacity 0.25s ease;
+}
+
+.overlay-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.washi-modal {
+  position: relative;
+  width: min(980px, 95%);
+  max-height: 94%;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 250, 240, 0.95), rgba(232, 217, 194, 0.97)),
+    repeating-linear-gradient(45deg, rgba(160, 135, 100, 0.04) 0px, rgba(160, 135, 100, 0.04) 2px, transparent 2px, transparent 6px);
+  border: 3px solid var(--sumi-black);
+  box-shadow:
+    0 20px 55px rgba(0, 0, 0, 0.75),
+    inset 0 0 32px rgba(135, 102, 65, 0.28);
+  padding: 22px 28px;
+  text-align: center;
+  color: var(--sumi-black);
+}
+
+.red-hanko-seal {
+  position: absolute;
+  top: 18px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border: 2.5px solid var(--vermilion);
+  color: var(--vermilion);
+  font-family: 'Yuji Syuku', serif;
+  font-size: 0.95rem;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  transform: rotate(6deg);
+  opacity: 0.88;
+  box-shadow: inset 0 0 0 1px rgba(201, 42, 42, 0.35);
+}
+
+.game-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.kanji-title {
+  font-family: 'Yuji Syuku', serif;
+  font-size: 2.7rem;
+  line-height: 1;
+  color: var(--sumi-black);
+  text-shadow: 3px 3px 0px rgba(201, 42, 42, 0.35);
+  letter-spacing: 8px;
+}
+
+.en-title {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: var(--vermilion);
+  letter-spacing: 6px;
+  margin-top: 2px;
+}
+
+.sub-title {
+  font-size: 0.8rem;
+  color: #574a3d;
+  letter-spacing: 1.5px;
+  margin-top: 2px;
+}
+
+.mode-selector {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mode-pill, .stage-pill {
+  background: rgba(24, 21, 18, 0.08);
+  border: 1.5px solid #3d342b;
+  color: var(--sumi-black);
+  padding: 5px 14px;
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+}
+
+.mode-pill.active, .stage-pill.active {
+  background: var(--sumi-black);
+  color: var(--washi-cream);
+  border-color: var(--vermilion);
+  box-shadow: 0 3px 10px rgba(24, 21, 18, 0.3);
+}
+
+.selection-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin: 8px 0 6px;
+}
+
+.p1-pick-badge, .p2-pick-badge {
+  padding: 5px 14px;
+  font-size: 0.9rem;
+  font-weight: 900;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.p1-pick-badge {
+  border-left: 5px solid var(--vermilion);
+}
+
+.p2-pick-badge {
+  border-right: 5px solid var(--indigo-ink);
+}
+
+.vs-seal {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--vermilion);
+  color: #fff;
+  font-family: 'Yuji Syuku', serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+}
+
+.pick-instructions {
+  font-size: 0.76rem;
+  color: #5c4f42;
+  margin-bottom: 10px;
+}
+
+.fighter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fighter-card {
+  position: relative;
+  background: rgba(250, 244, 234, 0.9);
+  border: 2px solid #3a3129;
+  padding: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.fighter-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(24, 21, 18, 0.22);
+}
+
+.fighter-card.selected-p1 {
+  border-color: var(--vermilion);
+  box-shadow: 0 0 0 2px var(--vermilion), 0 8px 18px rgba(201, 42, 42, 0.25);
+}
+
+.fighter-card.selected-p2 {
+  border-color: var(--indigo-ink);
+  box-shadow: 0 0 0 2px var(--indigo-ink), 0 8px 18px rgba(30, 58, 95, 0.25);
+}
+
+.fighter-card.selected-p1.selected-p2 {
+  border-color: var(--gold-leaf);
+  box-shadow: 0 0 0 2px var(--vermilion), 0 0 0 4px var(--indigo-ink);
+}
+
+.fighter-portrait-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 11;
+  overflow: hidden;
+  background: #dfd1bd;
+  border: 1px solid #594b3e;
+  margin-bottom: 7px;
+  position: relative;
+}
+
+.fighter-portrait-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.fighter-card:hover .fighter-portrait-wrap img {
+  transform: scale(1.06);
+}
+
+.fighter-kanji-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  background: rgba(24, 21, 18, 0.82);
+  color: var(--washi-cream);
+  font-family: 'Yuji Syuku', serif;
+  padding: 1px 6px;
+  font-size: 0.85rem;
+}
+
+.fighter-name-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+
+.fighter-name {
+  font-weight: 900;
+  font-size: 0.92rem;
+  color: var(--sumi-black);
+}
+
+.fighter-title {
+  font-size: 0.7rem;
+  color: var(--vermilion);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.fighter-desc {
+  font-size: 0.69rem;
+  color: #4a3f35;
+  line-height: 1.3;
+  margin-bottom: 6px;
+  flex-grow: 1;
+}
+
+.fighter-stats {
+  display: flex;
+  gap: 6px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #2e261f;
+  border-top: 1px dashed rgba(60, 48, 36, 0.3);
+  padding-top: 4px;
+}
+
+.stage-selector-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.stage-label {
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.primary-ink-btn {
+  background: linear-gradient(135deg, #241e1a 0%, #120f0d 100%);
+  color: var(--washi-cream);
+  border: 2px solid var(--vermilion);
+  padding: 10px 30px;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  box-shadow: 0 6px 20px rgba(201, 42, 42, 0.35);
+}
+
+.primary-ink-btn:hover {
+  background: var(--vermilion);
+  color: #fff;
+  transform: scale(1.02);
+}
+
+/* Help Modal Scroll */
+.help-scroll h2 {
+  font-family: 'Yuji Syuku', serif;
+  font-size: 1.65rem;
+  margin-bottom: 14px;
+  border-bottom: 2px solid var(--sumi-black);
+  padding-bottom: 6px;
+}
+
+.controls-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  text-align: left;
+  margin-bottom: 14px;
+}
+
+.control-card {
+  background: rgba(255, 250, 242, 0.72);
+  border: 1.5px solid #4a3f35;
+  padding: 12px 14px;
+}
+
+.control-card h3 {
+  font-size: 0.98rem;
+  color: var(--vermilion);
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(74, 63, 53, 0.3);
+  padding-bottom: 4px;
+}
+
+.control-card ul {
+  list-style: none;
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+
+kbd {
+  background: #2b241e;
+  color: #f7efe4;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.72rem;
+  font-family: monospace;
+}
+
+.bushido-tips {
+  text-align: left;
+  background: rgba(201, 42, 42, 0.08);
+  border-left: 4px solid var(--vermilion);
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.bushido-tips p + p {
+  margin-top: 4px;
+}
