@@ -1,4 +1,5 @@
 import { FighterConfig, StageId } from './fighters';
+import { WatercolorSpriteAnimator } from './spriteAnimator';
 
 export interface InkParticle {
   x: number;
@@ -84,6 +85,7 @@ export class WatercolorRenderer {
   private stageBgLoaded: boolean = false;
   private portraitImages: Map<string, HTMLImageElement> = new Map();
   private fighterSprites: Map<string, ProcessedFighterSprite> = new Map();
+  public spriteAnimator: WatercolorSpriteAnimator = new WatercolorSpriteAnimator();
 
   public particles: InkParticle[] = [];
   public ambientPetals: InkParticle[] = [];
@@ -569,13 +571,16 @@ export class WatercolorRenderer {
     ctx.restore();
   }
 
-  // Render an articulated Samurai Fighter using their full-body Japanese Watercolor & Sumi-e artwork
-  // with procedural squash/stretch, breathing, lunge skew, afterimages, and brush aura
+  // Render an articulated Samurai Fighter using their multi-pose Japanese Watercolor & Sumi-e sprite sheet
+  // combined with 14-slice anatomical skeletal deformation (breathing chest, striding legs, torso whip, and afterimages)
   public renderSamuraiFighter(
     ctx: CanvasRenderingContext2D,
     config: FighterConfig,
     x: number,
     y: number,
+    vx: number,
+    vy: number,
+    isGrounded: boolean,
     facing: 1 | -1,
     state: string,
     stateFrame: number,
@@ -585,93 +590,32 @@ export class WatercolorRenderer {
     hitFlashFrames: number,
     activeAttackKey: string | null
   ): void {
-    // Ensure sprite is loading / processed
-    this.preloadFighterSprite(config.spriteUrl);
-    const sprite = this.fighterSprites.get(config.spriteUrl);
+    // Ensure multi-pose sprite sheet + base idle stance are loaded
+    this.spriteAnimator.ensureFighterLoaded(config.id, config.spriteUrl, config.sheetUrl);
 
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(facing, 1);
 
-    // 1. Ground ink shadow beneath feet
-    ctx.fillStyle = 'rgba(20, 16, 13, 0.42)';
+    // 1. Ground ink shadow beneath feet (scales dynamically with jump height)
+    const heightOffGround = Math.max(0, 610 - y);
+    const shadowScale = Math.max(0.35, 1 - heightOffGround / 320);
+    ctx.fillStyle = `rgba(20, 16, 13, ${0.42 * shadowScale})`;
     ctx.beginPath();
-    ctx.ellipse(0, 0, config.bodyWidth * 0.85, 13, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, heightOffGround, config.bodyWidth * 0.9 * shadowScale, 13 * shadowScale, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Compute dynamic animation transforms (breathing, walk bob, crouch squash, attack lunge & rotation)
-    const breatheScaleY = 1 + Math.sin(animTick * 0.09) * 0.018;
-    const breatheScaleX = 1 - Math.sin(animTick * 0.09) * 0.01;
     const isMoving = state === 'walk_fwd' || state === 'walk_back' || state === 'dash';
-    const walkBobY = isMoving ? Math.abs(Math.sin(animTick * 0.34)) * -10 : 0;
-    const walkTilt =
-      state === 'dash'
-        ? 0.16
-        : state === 'walk_fwd'
-          ? 0.06 + Math.sin(animTick * 0.34) * 0.03
-          : state === 'walk_back'
-            ? -0.05
-            : 0;
-
-    let scaleX = breatheScaleX;
-    let scaleY = breatheScaleY;
-    let rotation = walkTilt;
-    let offsetX = 0;
-    let offsetY = walkBobY;
-
-    if (state === 'crouch') {
-      scaleY = 0.76;
-      scaleX = 1.12;
-      offsetY = 6;
-    } else if (state === 'jump') {
-      scaleY = 1.06;
-      scaleX = 0.95;
-      rotation = -0.06;
-    } else if (state === 'attack' && activeAttackKey) {
-      const atk = config.attacks[activeAttackKey as keyof typeof config.attacks];
-      const total = atk.startup + atk.active + atk.recovery;
-      if (stateFrame <= atk.startup) {
-        // Coil back before strike
-        const wp = stateFrame / Math.max(1, atk.startup);
-        rotation = -0.14 * wp;
-        offsetX = -16 * wp;
-        scaleX = 0.94;
-        scaleY = 1.04;
-      } else if (stateFrame <= atk.startup + atk.active) {
-        // Explosive forward slash lunge!
-        const ap = (stateFrame - atk.startup) / Math.max(1, atk.active);
-        rotation = 0.18 - ap * 0.06;
-        offsetX = 28;
-        scaleX = 1.12;
-        scaleY = 0.95;
-      } else {
-        // Zanshin follow-through recovery
-        const rp = (stateFrame - atk.startup - atk.active) / Math.max(1, atk.recovery);
-        rotation = 0.12 * (1 - rp);
-        offsetX = 28 * (1 - rp);
-      }
-    } else if (state === 'parry') {
-      rotation = -0.06;
-      scaleY = 1.04;
-    } else if (state === 'blockstun') {
-      rotation = -0.1;
-      offsetX = -10;
-    } else if (state === 'hitstun') {
-      rotation = -0.24;
-      offsetX = -18;
-      scaleX = 0.94;
-    } else if (state === 'ko') {
-      rotation = -1.48;
-      offsetY = -18;
-    }
-
-    const shoulderY = -120 + offsetY;
+    const atk =
+      state === 'attack' && activeAttackKey
+        ? config.attacks[activeAttackKey as keyof typeof config.attacks]
+        : null;
 
     // 2. Back flowing watercolor scarf / spirit ribbon
     this.drawFlowingWatercolorRibbon(
       ctx,
-      -18 + offsetX,
-      shoulderY,
+      -18,
+      -122,
       animTick,
       config.accentWatercolor,
       config.secondaryWatercolor,
@@ -680,85 +624,80 @@ export class WatercolorRenderer {
 
     // 3. Wet Watercolor Inner Wash Aura behind the painted figure
     const auraGrad = ctx.createRadialGradient(
-      offsetX,
+      0,
       -config.bodyHeight * 0.55,
       12,
-      offsetX,
+      0,
       -config.bodyHeight * 0.55,
-      config.bodyHeight * 0.75
+      config.bodyHeight * 0.78
     );
-    auraGrad.addColorStop(0, this.hexToRgba(config.accentWatercolor, state === 'attack' ? 0.42 : 0.24));
+    auraGrad.addColorStop(0, this.hexToRgba(config.accentWatercolor, state === 'attack' ? 0.44 : 0.22));
     auraGrad.addColorStop(0.6, this.hexToRgba(config.secondaryWatercolor, 0.12));
     auraGrad.addColorStop(1, this.hexToRgba(config.accentWatercolor, 0));
     ctx.fillStyle = auraGrad;
     ctx.beginPath();
-    ctx.arc(offsetX, -config.bodyHeight * 0.55, config.bodyHeight * 0.75, 0, Math.PI * 2);
+    ctx.arc(0, -config.bodyHeight * 0.55, config.bodyHeight * 0.78, 0, Math.PI * 2);
     ctx.fill();
 
-    // 4. Render Full-Body Painted Watercolor Sprite (or fallback while loading on frame 1)
-    if (sprite) {
-      const targetHeight = config.bodyHeight * 1.48; // ~215-250px tall including weapon/hair crest
-      const drawScale = targetHeight / sprite.cropH;
-      const drawW = sprite.cropW * drawScale;
-      const drawH = targetHeight;
-      const anchorX = sprite.footCenterX * drawScale;
+    if (state === 'ko') {
+      ctx.rotate(-1.46);
+      ctx.translate(0, -22);
+    }
 
-      // Draw ghosting watercolor afterimage during Dash, Special, or Super Arts!
-      if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
-        ctx.save();
-        ctx.translate(offsetX - 26, offsetY);
-        ctx.rotate(rotation * 0.7);
-        ctx.scale(scaleX, scaleY);
-        ctx.globalAlpha = 0.35;
-        ctx.filter = 'sepia(1) saturate(4) hue-rotate(-25deg)';
-        ctx.drawImage(
-          sprite.canvas,
-          sprite.cropX,
-          sprite.cropY,
-          sprite.cropW,
-          sprite.cropH,
-          -anchorX,
-          -drawH + 8,
-          drawW,
-          drawH
-        );
-        ctx.restore();
-      }
+    const targetHeight = config.bodyHeight * 1.5;
 
+    const deformParams = {
+      state,
+      stateFrame,
+      animTick,
+      vx,
+      vy,
+      facing,
+      isGrounded,
+      activeAttackKey,
+      attackStartup: atk ? atk.startup : 6,
+      attackActive: atk ? atk.active : 6,
+      attackRecovery: atk ? atk.recovery : 12,
+    };
+
+    // 4. Ghosting watercolor afterimage during Dash, Special, or Super Arts!
+    if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
       ctx.save();
-      ctx.translate(offsetX, offsetY);
-      ctx.rotate(rotation);
-      ctx.scale(scaleX, scaleY);
-
-      if (hitFlashFrames > 0) {
-        ctx.filter = 'brightness(2.2) contrast(1.2) saturate(1.8)';
-      } else if (isParrying || state === 'parry') {
-        ctx.filter = 'drop-shadow(0px 0px 10px #fcc419) brightness(1.15)';
-      } else {
-        ctx.filter = `drop-shadow(0px 4px 6px rgba(24, 21, 18, 0.32))`;
-      }
-
-      ctx.drawImage(
-        sprite.canvas,
-        sprite.cropX,
-        sprite.cropY,
-        sprite.cropW,
-        sprite.cropH,
-        -anchorX,
-        -drawH + 8,
-        drawW,
-        drawH
+      ctx.translate(-32, 0);
+      ctx.globalAlpha = 0.34;
+      this.spriteAnimator.renderArticulatedFighter(
+        ctx,
+        config.id,
+        targetHeight,
+        { ...deformParams, stateFrame: Math.max(0, stateFrame - 2) },
+        'sepia(1) saturate(4) hue-rotate(-25deg)'
       );
       ctx.restore();
     }
 
-    // 5. Mind's Eye Parry Golden Enso Circle (圓相)
+    // 5. Render Primary Multi-Pose Articulated Fighter
+    const filterCss =
+      hitFlashFrames > 0
+        ? 'brightness(2.2) contrast(1.2) saturate(1.8)'
+        : isParrying || state === 'parry'
+          ? 'drop-shadow(0px 0px 10px #fcc419) brightness(1.15)'
+          : 'drop-shadow(0px 4px 6px rgba(24, 21, 18, 0.32))';
+
+    this.spriteAnimator.renderArticulatedFighter(
+      ctx,
+      config.id,
+      targetHeight,
+      deformParams,
+      filterCss
+    );
+
+    // 6. Mind's Eye Parry Golden Enso Circle (圓相)
     if (isParrying || state === 'parry') {
       ctx.save();
       ctx.strokeStyle = '#f59f00';
       ctx.lineWidth = 5.5;
       ctx.beginPath();
-      ctx.arc(16 + offsetX, -config.bodyHeight * 0.58, 68, -0.4, Math.PI * 1.65);
+      ctx.arc(16, -config.bodyHeight * 0.58, 68, -0.4, Math.PI * 1.65);
       ctx.stroke();
       ctx.restore();
     }

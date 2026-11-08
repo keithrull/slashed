@@ -129,6 +129,7 @@ export class SlashedGameEngine {
   public roundOverFrames: number = 0;
   public matchWinnerIndex: 0 | 1 | null = null;
   public isPausedByModal: boolean = true;
+  public autoDemoWatch: boolean = false;
 
   // Input tracking for P1 and P2
   private keysDown: Set<string> = new Set();
@@ -141,10 +142,10 @@ export class SlashedGameEngine {
     this.ctx = canvas.getContext('2d')!;
     this.renderer = new WatercolorRenderer(canvas.width, canvas.height);
 
-    // Preload all fighter portraits & full-body watercolor sprites
+    // Preload all fighter portraits & multi-pose watercolor sprite sheets
     Object.values(FIGHTER_ROSTER).forEach((f) => {
       this.renderer.preloadPortrait(f.portraitUrl);
-      this.renderer.preloadFighterSprite(f.spriteUrl);
+      this.renderer.spriteAnimator.ensureFighterLoaded(f.id, f.spriteUrl, f.sheetUrl);
     });
 
     this.fighters = [
@@ -409,9 +410,11 @@ export class SlashedGameEngine {
       }
     }
 
-    const p1Inputs = this.gatherPlayerInputs(0);
+    const p1Inputs = this.autoDemoWatch
+      ? this.computeAIInputs(this.fighters[0], this.fighters[1])
+      : this.gatherPlayerInputs(0);
     const p2Inputs =
-      this.mode === 'versus'
+      this.mode === 'versus' && !this.autoDemoWatch
         ? this.gatherPlayerInputs(1)
         : this.computeAIInputs(this.fighters[1], this.fighters[0]);
 
@@ -646,26 +649,40 @@ export class SlashedGameEngine {
       this.applyGravityAndBounds(f);
       if (f.isGrounded()) {
         f.state = 'idle';
-        f.vx = 0;
+        f.vx *= 0.35;
+        sound.playTaiko(0.45, 110);
+        this.renderer.spawnInkBurst(f.x, 608, 6, f.config.primaryInk, f.config.accentWatercolor);
+        this.renderer.stampWatercolorBloom(f.x, 608, 22, f.config.primaryInk, 0.18);
       }
       return;
     }
 
-    // Crouch vs Walk vs Idle
+    // Crouch vs Smooth Accelerated Walk vs Friction Deceleration
     if (inputs.down) {
       f.state = 'crouch';
-      f.vx = 0;
+      f.vx *= 0.65;
+      f.x += f.vx;
     } else if (inputs.left) {
       f.state = f.facing === 1 ? 'walk_back' : 'walk_fwd';
-      f.vx = -f.config.walkSpeed * (f.state === 'walk_back' ? 0.82 : 1.0);
+      const targetVx = -f.config.walkSpeed * (f.state === 'walk_back' ? 0.82 : 1.0);
+      f.vx += (targetVx - f.vx) * 0.35;
       f.x += f.vx;
+      if (f.animTick % 14 === 0) {
+        this.renderer.spawnInkBurst(f.x, 608, 2, f.config.primaryInk, f.config.accentWatercolor, 1.5);
+      }
     } else if (inputs.right) {
       f.state = f.facing === -1 ? 'walk_back' : 'walk_fwd';
-      f.vx = f.config.walkSpeed * (f.state === 'walk_back' ? 0.82 : 1.0);
+      const targetVx = f.config.walkSpeed * (f.state === 'walk_back' ? 0.82 : 1.0);
+      f.vx += (targetVx - f.vx) * 0.35;
       f.x += f.vx;
+      if (f.animTick % 14 === 0) {
+        this.renderer.spawnInkBurst(f.x, 608, 2, f.config.primaryInk, f.config.accentWatercolor, -1.5);
+      }
     } else {
       f.state = 'idle';
-      f.vx = 0;
+      f.vx *= 0.72;
+      if (Math.abs(f.vx) < 0.15) f.vx = 0;
+      f.x += f.vx;
     }
 
     this.applyGravityAndBounds(f);
@@ -1103,6 +1120,9 @@ export class SlashedGameEngine {
         f.config,
         f.x,
         f.y,
+        f.vx,
+        f.vy,
+        f.isGrounded(),
         f.facing,
         f.state,
         f.stateFrame,

@@ -22,6 +22,7 @@ const assignTargetLabel = document.getElementById('assign-target-label')!;
 const btnModeToggle = document.getElementById('btn-mode-toggle')!;
 const btnCharSelect = document.getElementById('btn-char-select')!;
 const btnPracticeAi = document.getElementById('btn-practice-ai')!;
+const btnAutoDemo = document.getElementById('btn-auto-demo')!;
 const btnClearInk = document.getElementById('btn-clear-ink')!;
 const btnSound = document.getElementById('btn-sound')!;
 const btnHelp = document.getElementById('btn-help')!;
@@ -158,6 +159,15 @@ btnPracticeAi.addEventListener('click', () => {
   engine.aiDifficulty = next;
   btnPracticeAi.textContent = `AI: ${next}`;
   sound.playTaiko(0.7, 98);
+});
+
+btnAutoDemo.addEventListener('click', () => {
+  engine.autoDemoWatch = !engine.autoDemoWatch;
+  btnAutoDemo.textContent = `CPU Watch: ${engine.autoDemoWatch ? 'ON' : 'OFF'}`;
+  if (engine.autoDemoWatch && !overlayScreen.classList.contains('hidden')) {
+    launchMatchFromModal();
+  }
+  sound.playTaiko(0.75, 92);
 });
 
 btnClearInk.addEventListener('click', () => {
