@@ -155,13 +155,13 @@ btnCharSelect.addEventListener('click', () => {
 });
 
 btnVisualStyle.addEventListener('click', () => {
-  const styles: Array<'puppet' | '3d' | 'scroll'> = ['puppet', '3d', 'scroll'];
+  const styles: Array<'scroll' | 'puppet' | '3d'> = ['scroll', 'puppet', '3d'];
   const next = styles[(styles.indexOf(engine.renderer.renderStyle) + 1) % styles.length];
   engine.renderer.renderStyle = next;
-  const labels: Record<'puppet' | '3d' | 'scroll', string> = {
-    puppet: 'Art: Painted Bone Rig',
+  const labels: Record<'scroll' | 'puppet' | '3d', string> = {
+    scroll: 'Art: Original Painted',
+    puppet: 'Art: 14-Bone Mannequin',
     '3d': 'Art: 3D Sumi-e Shader',
-    scroll: 'Art: 2D Pose Scroll',
   };
   btnVisualStyle.textContent = labels[next];
   sound.playTaiko(0.7, 102);

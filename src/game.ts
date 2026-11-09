@@ -1,6 +1,7 @@
 import { AttackFrameData, FIGHTER_ROSTER, FighterConfig, FighterId, StageId } from './fighters';
 import { sound } from './audio';
 import { WatercolorProjectile, WatercolorRenderer } from './watercolor';
+import { Samurai3DWatercolorEngine } from './samurai3d';
 
 export type GameMode = 'ai' | 'versus' | 'training';
 export type AIDifficulty = 'Novice' | 'Ronin' | 'Kensei';
@@ -1135,6 +1136,9 @@ export class SlashedGameEngine {
     }
 
     if (this.renderer.renderStyle === '3d') {
+      if (!this.renderer.samurai3D) {
+        this.renderer.samurai3D = new Samurai3DWatercolorEngine(this.canvas.width, this.canvas.height);
+      }
       const buildPose = (f: FighterInstance) => {
         const atk =
           f.state === 'attack' && f.activeAttackKey

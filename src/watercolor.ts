@@ -89,8 +89,8 @@ export class WatercolorRenderer {
   private fighterSprites: Map<string, ProcessedFighterSprite> = new Map();
   public spriteAnimator: WatercolorSpriteAnimator = new WatercolorSpriteAnimator();
   public puppetRig: PrecisionWatercolorSamuraiRig = new PrecisionWatercolorSamuraiRig();
-  public samurai3D: Samurai3DWatercolorEngine;
-  public renderStyle: 'puppet' | '3d' | 'scroll' = 'puppet';
+  public samurai3D: Samurai3DWatercolorEngine | null = null;
+  public renderStyle: 'scroll' | 'puppet' | '3d' = 'scroll';
 
   public particles: InkParticle[] = [];
   public ambientPetals: InkParticle[] = [];
@@ -114,7 +114,6 @@ export class WatercolorRenderer {
       this.stageBgLoaded = true;
     };
 
-    this.samurai3D = new Samurai3DWatercolorEngine(width, height);
     this.initAmbientPetals();
   }
 
@@ -660,60 +659,20 @@ export class WatercolorRenderer {
       vy,
       facing,
       isGrounded,
+      hitFlashFrames,
+      isParrying,
       activeAttackKey,
       attackStartup: atk ? atk.startup : 6,
       attackActive: atk ? atk.active : 6,
       attackRecovery: atk ? atk.recovery : 12,
     };
 
-    // 4. Render Fighter in Selected Style ('puppet' = 6-part Bone-Rigged Watercolor Artwork, 'scroll' = Multi-pose 2D, '3d' = Three.js 3D Shader Rig)
-    const filterCss =
-      hitFlashFrames > 0
-        ? 'brightness(2.2) contrast(1.2) saturate(1.8)'
-        : isParrying || state === 'parry'
-          ? 'drop-shadow(0px 0px 10px #fcc419) brightness(1.15)'
-          : 'drop-shadow(0px 4px 6px rgba(24, 21, 18, 0.32))';
-
-    if (this.renderStyle === 'puppet') {
-      if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
-        ctx.save();
-        ctx.translate(-30, 0);
-        ctx.globalAlpha = 0.28;
-        this.puppetRig.renderSamurai(
-          ctx,
-          `ghost_${facing}`,
-          config,
-          { ...deformParams, stateFrame: Math.max(0, stateFrame - 2) }
-        );
-        ctx.restore();
-      }
-
-      ctx.save();
-      ctx.filter = filterCss;
+    // 4. Render Fighter in Selected Style ('scroll' = Fast 60fps Original Painted Poses, 'puppet' = 14-Bone Mannequin, '3d' = Three.js Shader Rig)
+    if (this.renderStyle === 'scroll') {
+      const scaleMult = config.id === 'raidenbo' ? 1.12 : config.id === 'hotaru' ? 0.94 : 1.0;
+      this.spriteAnimator.renderFastFighter(ctx, config.id, scaleMult, deformParams);
+    } else if (this.renderStyle === 'puppet') {
       this.puppetRig.renderSamurai(ctx, `main_${facing}`, config, deformParams);
-      ctx.restore();
-    } else if (this.renderStyle !== '3d') {
-      if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
-        ctx.save();
-        ctx.translate(-32, 0);
-        ctx.globalAlpha = 0.34;
-        this.spriteAnimator.renderArticulatedFighter(
-          ctx,
-          config.id,
-          targetHeight,
-          { ...deformParams, stateFrame: Math.max(0, stateFrame - 2) },
-          'sepia(1) saturate(4) hue-rotate(-25deg)'
-        );
-        ctx.restore();
-      }
-
-      this.spriteAnimator.renderArticulatedFighter(
-        ctx,
-        config.id,
-        targetHeight,
-        deformParams,
-        filterCss
-      );
     }
 
     // 6. Mind's Eye Parry Golden Enso Circle (圓相)
