@@ -667,12 +667,13 @@ export class WatercolorRenderer {
       attackRecovery: atk ? atk.recovery : 12,
     };
 
-    // 4. Render Fighter in Selected Style ('scroll' = Fast 60fps Original Painted Poses, 'puppet' = 14-Bone Mannequin, '3d' = Three.js Shader Rig)
+    // 4. Render Fighter in Selected Style ('scroll' = Fast 60fps Original Painted Poses, 'puppet' = 14-Bone Skinned Watercolor Mesh, '3d' = Three.js Shader Rig)
     if (this.renderStyle === 'scroll') {
       const scaleMult = config.id === 'raidenbo' ? 1.12 : config.id === 'hotaru' ? 0.94 : 1.0;
       this.spriteAnimator.renderFastFighter(ctx, config.id, scaleMult, deformParams);
     } else if (this.renderStyle === 'puppet') {
-      this.puppetRig.renderSamurai(ctx, `main_${facing}`, config, deformParams);
+      const activePose = this.spriteAnimator.getActivePoseSprite(config.id, deformParams);
+      this.puppetRig.renderSamurai(ctx, `main_${facing}`, config, deformParams, activePose);
     }
 
     // 6. Mind's Eye Parry Golden Enso Circle (圓相)

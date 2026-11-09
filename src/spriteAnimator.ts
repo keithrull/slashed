@@ -11,6 +11,7 @@ export interface NormalizedPoseSprite {
   height: number;
   anchorX: number; // Horizontal center of the character's stance on the floor
   anchorY: number; // Exact bottom of the character's feet
+  legSplitU: number; // Normalized [0..1] horizontal split between back leg and front leg
 }
 
 export interface FighterPoseSet {
@@ -193,6 +194,32 @@ export class WatercolorSpriteAnimator {
     const cropH = Math.max(1, maxY - minY + 1);
     const rawCenterX = bodyCount > 0 ? bodySumX / bodyCount - minX : cropW * 0.45;
 
+    // Detect the horizontal split between the Back Leg and Front Leg in the lower 22% of the figure
+    const legYStart = Math.floor(minY + hSpan * 0.78);
+    let leftFootSum = 0,
+      leftFootCnt = 0,
+      rightFootSum = 0,
+      rightFootCnt = 0;
+    const midGuess = minX + rawCenterX;
+    for (let y = legYStart; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if (data[(y * sw + x) * 4 + 3] > 90) {
+          if (x < midGuess) {
+            leftFootSum += x - minX;
+            leftFootCnt++;
+          } else {
+            rightFootSum += x - minX;
+            rightFootCnt++;
+          }
+        }
+      }
+    }
+    const legSplitPx =
+      leftFootCnt > 20 && rightFootCnt > 20
+        ? (leftFootSum / leftFootCnt + rightFootSum / rightFootCnt) * 0.5
+        : rawCenterX;
+    const legSplitU = Math.max(0.28, Math.min(0.68, legSplitPx / cropW));
+
     // Pre-bake scaled Normal, Hit-Flash, and Ghost Afterimage canvases once at load time (ZERO runtime filter lag!)
     const pad = 8;
     const scale = normalizedBodyHeight / cropH;
@@ -236,7 +263,50 @@ export class WatercolorSpriteAnimator {
       height: finalH,
       anchorX: pad + rawCenterX * scale,
       anchorY: finalH - pad,
+      legSplitU,
     };
+  }
+
+  public getActivePoseSprite(fighterId: string, params: FastAnimParams): NormalizedPoseSprite | null {
+    const set = this.poseSets.get(fighterId);
+    if (!set || !set.idle) return null;
+
+    let pose: NormalizedPoseSprite = set.idle;
+
+    if (params.state === 'attack' && params.activeAttackKey) {
+      const f = params.stateFrame;
+      const sUp = params.attackStartup;
+      const act = params.attackActive;
+
+      if (f < sUp * 0.55) {
+        pose = set.guard || set.idle;
+      } else if (f <= sUp + act + 4) {
+        const isHeavyOrAir =
+          params.activeAttackKey === 'heavy' ||
+          params.activeAttackKey === 'special2' ||
+          params.activeAttackKey === 'super' ||
+          !params.isGrounded;
+        pose = (isHeavyOrAir ? set.heavy || set.slash : set.slash || set.heavy) || set.idle;
+      } else {
+        pose = set.slash || set.idle;
+      }
+    } else if (params.state === 'dash') {
+      pose = set.run || set.idle;
+    } else if (params.state === 'walk_fwd' || params.state === 'walk_back') {
+      const stride = Math.sin(params.animTick * 0.34);
+      pose = Math.abs(stride) > 0.25 && set.run ? set.run : set.idle;
+    } else if (!params.isGrounded) {
+      pose = set.heavy || set.run || set.idle;
+    } else if (
+      params.state === 'parry' ||
+      params.state === 'blockstun' ||
+      params.state === 'hitstun' ||
+      params.state === 'crouch'
+    ) {
+      pose = set.guard || set.idle;
+    }
+
+    return pose;
   }
 
   // Renders the fighter in a single hardware-accelerated drawImage call (0ms CPU overhead, locked 60fps!)
