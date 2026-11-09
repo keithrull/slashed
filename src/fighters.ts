@@ -38,6 +38,7 @@ export interface FighterConfig {
   portraitUrl: string;
   spriteUrl: string;
   sheetUrl: string;
+  partsUrl: string;
   maxHealth: number;
   walkSpeed: number;
   dashSpeed: number;
@@ -70,6 +71,7 @@ export const FIGHTER_ROSTER: Record<FighterId, FighterConfig> = {
     portraitUrl: '/assets/portrait_kazemaru.jpg',
     spriteUrl: '/assets/sprite_kazemaru.jpg',
     sheetUrl: '/assets/sheet_kazemaru.jpg',
+    partsUrl: '/assets/parts_kazemaru.jpg',
     maxHealth: 1000,
     walkSpeed: 5.4,
     dashSpeed: 12.5,
@@ -231,6 +233,7 @@ export const FIGHTER_ROSTER: Record<FighterId, FighterConfig> = {
     portraitUrl: '/assets/portrait_hotaru.jpg',
     spriteUrl: '/assets/sprite_hotaru.jpg',
     sheetUrl: '/assets/sheet_hotaru.jpg',
+    partsUrl: '/assets/parts_hotaru.jpg',
     maxHealth: 900,
     walkSpeed: 6.6,
     dashSpeed: 15.0,
@@ -392,6 +395,7 @@ export const FIGHTER_ROSTER: Record<FighterId, FighterConfig> = {
     portraitUrl: '/assets/portrait_raidenbo.jpg',
     spriteUrl: '/assets/sprite_raidenbo.jpg',
     sheetUrl: '/assets/sheet_raidenbo.jpg',
+    partsUrl: '/assets/parts_raidenbo.jpg',
     maxHealth: 1220,
     walkSpeed: 4.1,
     dashSpeed: 10.2,
@@ -554,6 +558,7 @@ export const FIGHTER_ROSTER: Record<FighterId, FighterConfig> = {
     portraitUrl: '/assets/portrait_yuki.jpg',
     spriteUrl: '/assets/sprite_yuki.jpg',
     sheetUrl: '/assets/sheet_yuki.jpg',
+    partsUrl: '/assets/parts_yuki.jpg',
     maxHealth: 960,
     walkSpeed: 5.2,
     dashSpeed: 12.2,

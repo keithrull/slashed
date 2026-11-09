@@ -155,10 +155,15 @@ btnCharSelect.addEventListener('click', () => {
 });
 
 btnVisualStyle.addEventListener('click', () => {
-  engine.renderer.use3DRigMode = !engine.renderer.use3DRigMode;
-  btnVisualStyle.textContent = engine.renderer.use3DRigMode
-    ? 'Art: 3D Sumi-e Rig'
-    : 'Art: 2D Painted Scroll';
+  const styles: Array<'puppet' | '3d' | 'scroll'> = ['puppet', '3d', 'scroll'];
+  const next = styles[(styles.indexOf(engine.renderer.renderStyle) + 1) % styles.length];
+  engine.renderer.renderStyle = next;
+  const labels: Record<'puppet' | '3d' | 'scroll', string> = {
+    puppet: 'Art: Painted Bone Rig',
+    '3d': 'Art: 3D Sumi-e Shader',
+    scroll: 'Art: 2D Pose Scroll',
+  };
+  btnVisualStyle.textContent = labels[next];
   sound.playTaiko(0.7, 102);
 });
 

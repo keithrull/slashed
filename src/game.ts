@@ -142,9 +142,10 @@ export class SlashedGameEngine {
     this.ctx = canvas.getContext('2d')!;
     this.renderer = new WatercolorRenderer(canvas.width, canvas.height);
 
-    // Preload all fighter portraits & multi-pose watercolor sprite sheets
+    // Preload all fighter portraits, 6-part skeletal puppets & multi-pose watercolor sprite sheets
     Object.values(FIGHTER_ROSTER).forEach((f) => {
       this.renderer.preloadPortrait(f.portraitUrl);
+      this.renderer.puppetRig.ensurePuppetLoaded(f.id, f.partsUrl);
       this.renderer.spriteAnimator.ensureFighterLoaded(f.id, f.spriteUrl, f.sheetUrl);
     });
 
@@ -1134,7 +1135,7 @@ export class SlashedGameEngine {
       );
     }
 
-    if (this.renderer.use3DRigMode) {
+    if (this.renderer.renderStyle === '3d') {
       const buildPose = (f: FighterInstance) => {
         const atk =
           f.state === 'attack' && f.activeAttackKey

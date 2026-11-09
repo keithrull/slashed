@@ -1,6 +1,7 @@
 import { FighterConfig, StageId } from './fighters';
 import { WatercolorSpriteAnimator } from './spriteAnimator';
 import { Fighter3DPoseInput, Samurai3DWatercolorEngine } from './samurai3d';
+import { WatercolorPuppetRigEngine } from './puppetRig';
 
 export interface InkParticle {
   x: number;
@@ -87,8 +88,9 @@ export class WatercolorRenderer {
   private portraitImages: Map<string, HTMLImageElement> = new Map();
   private fighterSprites: Map<string, ProcessedFighterSprite> = new Map();
   public spriteAnimator: WatercolorSpriteAnimator = new WatercolorSpriteAnimator();
+  public puppetRig: WatercolorPuppetRigEngine = new WatercolorPuppetRigEngine();
   public samurai3D: Samurai3DWatercolorEngine;
-  public use3DRigMode: boolean = true;
+  public renderStyle: 'puppet' | '3d' | 'scroll' = 'puppet';
 
   public particles: InkParticle[] = [];
   public ambientPetals: InkParticle[] = [];
@@ -594,7 +596,8 @@ export class WatercolorRenderer {
     hitFlashFrames: number,
     activeAttackKey: string | null
   ): void {
-    // Ensure multi-pose sprite sheet + base idle stance are loaded
+    // Ensure 6-part skeletal puppet sheet & multi-pose sprite sheet are loaded
+    this.puppetRig.ensurePuppetLoaded(config.id, config.partsUrl);
     this.spriteAnimator.ensureFighterLoaded(config.id, config.spriteUrl, config.sheetUrl);
 
     ctx.save();
@@ -664,8 +667,39 @@ export class WatercolorRenderer {
       attackRecovery: atk ? atk.recovery : 12,
     };
 
-    // 4. Ghosting watercolor afterimage & Primary Fighter (2D Sprite Mode fallback if 3D Rig Mode is toggled off)
-    if (!this.use3DRigMode) {
+    // 4. Render Fighter in Selected Style ('puppet' = 6-part Bone-Rigged Watercolor Artwork, 'scroll' = Multi-pose 2D, '3d' = Three.js 3D Shader Rig)
+    const filterCss =
+      hitFlashFrames > 0
+        ? 'brightness(2.2) contrast(1.2) saturate(1.8)'
+        : isParrying || state === 'parry'
+          ? 'drop-shadow(0px 0px 10px #fcc419) brightness(1.15)'
+          : 'drop-shadow(0px 4px 6px rgba(24, 21, 18, 0.32))';
+
+    if (this.renderStyle === 'puppet' && this.puppetRig.isPuppetReady(config.id)) {
+      if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
+        ctx.save();
+        ctx.translate(-32, 0);
+        ctx.globalAlpha = 0.32;
+        this.puppetRig.renderPuppetFighter(
+          ctx,
+          `ghost_${facing}`,
+          config.id,
+          targetHeight,
+          { ...deformParams, stateFrame: Math.max(0, stateFrame - 2) },
+          'sepia(1) saturate(4) hue-rotate(-25deg)'
+        );
+        ctx.restore();
+      }
+
+      this.puppetRig.renderPuppetFighter(
+        ctx,
+        `main_${facing}`,
+        config.id,
+        targetHeight,
+        deformParams,
+        filterCss
+      );
+    } else if (this.renderStyle !== '3d') {
       if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
         ctx.save();
         ctx.translate(-32, 0);
@@ -679,13 +713,6 @@ export class WatercolorRenderer {
         );
         ctx.restore();
       }
-
-      const filterCss =
-        hitFlashFrames > 0
-          ? 'brightness(2.2) contrast(1.2) saturate(1.8)'
-          : isParrying || state === 'parry'
-            ? 'drop-shadow(0px 0px 10px #fcc419) brightness(1.15)'
-            : 'drop-shadow(0px 4px 6px rgba(24, 21, 18, 0.32))';
 
       this.spriteAnimator.renderArticulatedFighter(
         ctx,
