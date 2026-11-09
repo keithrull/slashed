@@ -1113,7 +1113,7 @@ export class SlashedGameEngine {
     // 1. Render Washi Paper, Stage Watercolor Artwork, Mist & Dried Ink Stains
     this.renderer.renderBackground(ctx, this.stage, performance.now(), superDark);
 
-    // 2. Render Both Samurai Fighters
+    // 2. Render Both Samurai Fighters (Ground shadows, watercolor auras & 3D Rigged Sumi-e Watercolor Pass)
     for (const f of this.fighters) {
       this.renderer.renderSamuraiFighter(
         ctx,
@@ -1131,6 +1131,40 @@ export class SlashedGameEngine {
         f.state === 'parry',
         f.hitFlashFrames,
         f.activeAttackKey
+      );
+    }
+
+    if (this.renderer.use3DRigMode) {
+      const buildPose = (f: FighterInstance) => {
+        const atk =
+          f.state === 'attack' && f.activeAttackKey
+            ? f.config.attacks[f.activeAttackKey]
+            : null;
+        return {
+          x: f.x,
+          y: f.y,
+          vx: f.vx,
+          vy: f.vy,
+          facing: f.facing,
+          isGrounded: f.isGrounded(),
+          state: f.state,
+          stateFrame: f.stateFrame,
+          animTick: f.animTick,
+          hitFlashFrames: f.hitFlashFrames,
+          isParrying: f.state === 'parry',
+          activeAttackKey: f.activeAttackKey,
+          attackStartup: atk ? atk.startup : 6,
+          attackActive: atk ? atk.active : 6,
+          attackRecovery: atk ? atk.recovery : 12,
+        };
+      };
+
+      this.renderer.samurai3D.renderTo2DCanvas(
+        ctx,
+        this.fighters[0].config,
+        buildPose(this.fighters[0]),
+        this.fighters[1].config,
+        buildPose(this.fighters[1])
       );
     }
 

@@ -1,5 +1,6 @@
 import { FighterConfig, StageId } from './fighters';
 import { WatercolorSpriteAnimator } from './spriteAnimator';
+import { Fighter3DPoseInput, Samurai3DWatercolorEngine } from './samurai3d';
 
 export interface InkParticle {
   x: number;
@@ -86,6 +87,8 @@ export class WatercolorRenderer {
   private portraitImages: Map<string, HTMLImageElement> = new Map();
   private fighterSprites: Map<string, ProcessedFighterSprite> = new Map();
   public spriteAnimator: WatercolorSpriteAnimator = new WatercolorSpriteAnimator();
+  public samurai3D: Samurai3DWatercolorEngine;
+  public use3DRigMode: boolean = true;
 
   public particles: InkParticle[] = [];
   public ambientPetals: InkParticle[] = [];
@@ -109,6 +112,7 @@ export class WatercolorRenderer {
       this.stageBgLoaded = true;
     };
 
+    this.samurai3D = new Samurai3DWatercolorEngine(width, height);
     this.initAmbientPetals();
   }
 
@@ -660,36 +664,37 @@ export class WatercolorRenderer {
       attackRecovery: atk ? atk.recovery : 12,
     };
 
-    // 4. Ghosting watercolor afterimage during Dash, Special, or Super Arts!
-    if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
-      ctx.save();
-      ctx.translate(-32, 0);
-      ctx.globalAlpha = 0.34;
+    // 4. Ghosting watercolor afterimage & Primary Fighter (2D Sprite Mode fallback if 3D Rig Mode is toggled off)
+    if (!this.use3DRigMode) {
+      if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
+        ctx.save();
+        ctx.translate(-32, 0);
+        ctx.globalAlpha = 0.34;
+        this.spriteAnimator.renderArticulatedFighter(
+          ctx,
+          config.id,
+          targetHeight,
+          { ...deformParams, stateFrame: Math.max(0, stateFrame - 2) },
+          'sepia(1) saturate(4) hue-rotate(-25deg)'
+        );
+        ctx.restore();
+      }
+
+      const filterCss =
+        hitFlashFrames > 0
+          ? 'brightness(2.2) contrast(1.2) saturate(1.8)'
+          : isParrying || state === 'parry'
+            ? 'drop-shadow(0px 0px 10px #fcc419) brightness(1.15)'
+            : 'drop-shadow(0px 4px 6px rgba(24, 21, 18, 0.32))';
+
       this.spriteAnimator.renderArticulatedFighter(
         ctx,
         config.id,
         targetHeight,
-        { ...deformParams, stateFrame: Math.max(0, stateFrame - 2) },
-        'sepia(1) saturate(4) hue-rotate(-25deg)'
+        deformParams,
+        filterCss
       );
-      ctx.restore();
     }
-
-    // 5. Render Primary Multi-Pose Articulated Fighter
-    const filterCss =
-      hitFlashFrames > 0
-        ? 'brightness(2.2) contrast(1.2) saturate(1.8)'
-        : isParrying || state === 'parry'
-          ? 'drop-shadow(0px 0px 10px #fcc419) brightness(1.15)'
-          : 'drop-shadow(0px 4px 6px rgba(24, 21, 18, 0.32))';
-
-    this.spriteAnimator.renderArticulatedFighter(
-      ctx,
-      config.id,
-      targetHeight,
-      deformParams,
-      filterCss
-    );
 
     // 6. Mind's Eye Parry Golden Enso Circle (圓相)
     if (isParrying || state === 'parry') {

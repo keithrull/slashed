@@ -21,6 +21,7 @@ const assignTargetLabel = document.getElementById('assign-target-label')!;
 
 const btnModeToggle = document.getElementById('btn-mode-toggle')!;
 const btnCharSelect = document.getElementById('btn-char-select')!;
+const btnVisualStyle = document.getElementById('btn-visual-style')!;
 const btnPracticeAi = document.getElementById('btn-practice-ai')!;
 const btnAutoDemo = document.getElementById('btn-auto-demo')!;
 const btnClearInk = document.getElementById('btn-clear-ink')!;
@@ -151,6 +152,14 @@ btnCharSelect.addEventListener('click', () => {
     overlayScreen.classList.add('hidden');
     engine.isPausedByModal = false;
   }
+});
+
+btnVisualStyle.addEventListener('click', () => {
+  engine.renderer.use3DRigMode = !engine.renderer.use3DRigMode;
+  btnVisualStyle.textContent = engine.renderer.use3DRigMode
+    ? 'Art: 3D Sumi-e Rig'
+    : 'Art: 2D Painted Scroll';
+  sound.playTaiko(0.7, 102);
 });
 
 btnPracticeAi.addEventListener('click', () => {
