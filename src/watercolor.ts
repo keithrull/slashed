@@ -1,7 +1,7 @@
 import { FighterConfig, StageId } from './fighters';
 import { WatercolorSpriteAnimator } from './spriteAnimator';
 import { Fighter3DPoseInput, Samurai3DWatercolorEngine } from './samurai3d';
-import { WatercolorPuppetRigEngine } from './puppetRig';
+import { PrecisionWatercolorSamuraiRig } from './puppetRig';
 
 export interface InkParticle {
   x: number;
@@ -88,7 +88,7 @@ export class WatercolorRenderer {
   private portraitImages: Map<string, HTMLImageElement> = new Map();
   private fighterSprites: Map<string, ProcessedFighterSprite> = new Map();
   public spriteAnimator: WatercolorSpriteAnimator = new WatercolorSpriteAnimator();
-  public puppetRig: WatercolorPuppetRigEngine = new WatercolorPuppetRigEngine();
+  public puppetRig: PrecisionWatercolorSamuraiRig = new PrecisionWatercolorSamuraiRig();
   public samurai3D: Samurai3DWatercolorEngine;
   public renderStyle: 'puppet' | '3d' | 'scroll' = 'puppet';
 
@@ -596,8 +596,7 @@ export class WatercolorRenderer {
     hitFlashFrames: number,
     activeAttackKey: string | null
   ): void {
-    // Ensure 6-part skeletal puppet sheet & multi-pose sprite sheet are loaded
-    this.puppetRig.ensurePuppetLoaded(config.id, config.partsUrl);
+    // Ensure multi-pose sprite sheet + base idle stance are loaded
     this.spriteAnimator.ensureFighterLoaded(config.id, config.spriteUrl, config.sheetUrl);
 
     ctx.save();
@@ -675,30 +674,24 @@ export class WatercolorRenderer {
           ? 'drop-shadow(0px 0px 10px #fcc419) brightness(1.15)'
           : 'drop-shadow(0px 4px 6px rgba(24, 21, 18, 0.32))';
 
-    if (this.renderStyle === 'puppet' && this.puppetRig.isPuppetReady(config.id)) {
+    if (this.renderStyle === 'puppet') {
       if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
         ctx.save();
-        ctx.translate(-32, 0);
-        ctx.globalAlpha = 0.32;
-        this.puppetRig.renderPuppetFighter(
+        ctx.translate(-30, 0);
+        ctx.globalAlpha = 0.28;
+        this.puppetRig.renderSamurai(
           ctx,
           `ghost_${facing}`,
-          config.id,
-          targetHeight,
-          { ...deformParams, stateFrame: Math.max(0, stateFrame - 2) },
-          'sepia(1) saturate(4) hue-rotate(-25deg)'
+          config,
+          { ...deformParams, stateFrame: Math.max(0, stateFrame - 2) }
         );
         ctx.restore();
       }
 
-      this.puppetRig.renderPuppetFighter(
-        ctx,
-        `main_${facing}`,
-        config.id,
-        targetHeight,
-        deformParams,
-        filterCss
-      );
+      ctx.save();
+      ctx.filter = filterCss;
+      this.puppetRig.renderSamurai(ctx, `main_${facing}`, config, deformParams);
+      ctx.restore();
     } else if (this.renderStyle !== '3d') {
       if (state === 'dash' || (state === 'attack' && activeAttackKey && activeAttackKey !== 'light')) {
         ctx.save();

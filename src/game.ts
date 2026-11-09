@@ -142,10 +142,9 @@ export class SlashedGameEngine {
     this.ctx = canvas.getContext('2d')!;
     this.renderer = new WatercolorRenderer(canvas.width, canvas.height);
 
-    // Preload all fighter portraits, 6-part skeletal puppets & multi-pose watercolor sprite sheets
+    // Preload all fighter portraits & multi-pose watercolor sprite sheets
     Object.values(FIGHTER_ROSTER).forEach((f) => {
       this.renderer.preloadPortrait(f.portraitUrl);
-      this.renderer.puppetRig.ensurePuppetLoaded(f.id, f.partsUrl);
       this.renderer.spriteAnimator.ensureFighterLoaded(f.id, f.spriteUrl, f.sheetUrl);
     });
 
